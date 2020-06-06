@@ -1,30 +1,93 @@
-https://www.digitalocean.com/community/tutorials/how-to-use-haproxy-to-set-up-http-load-balancing-on-an-ubuntu-vps
+# HAProxy-Rotating
 
-http://blog.databigbang.com/running-your-own-anonymous-rotating-proxies/
+The objective with this project is to build a Docker image which will provide a rotating [forward proxy](https://en.wikipedia.org/wiki/Proxy_server).
 
-https://stackoverflow.com/questions/56471379/why-always-receive-status-code-400-when-sending-http-request-to-haproxy
+## What is HAProxy?
 
-https://hub.docker.com/_/haproxy
+[HAProxy](http://www.haproxy.org/) is a reliable, high-performance TCP/HTTP load balancer.
 
-https://github.com/mattes/rotating-proxy
-https://github.com/39ff/docker-rotating-proxy
+Reference documentation:
 
-Manuals
+- [HAProxy Starter Guide](https://cbonte.github.io/haproxy-dconv/2.0/intro.html)
+- [HAProxy Configuration Manual](https://cbonte.github.io/haproxy-dconv/2.0/configuration.html) and
+- [HAProxy Management Guide](https://cbonte.github.io/haproxy-dconv/2.0/management.html).
 
-https://cbonte.github.io/haproxy-dconv/2.1/configuration.html
-https://cbonte.github.io/haproxy-dconv/2.1/intro.html
-https://cbonte.github.io/haproxy-dconv/2.1/management.html
+## HAProxy Configuration
 
-Config Examples
+The behaviour of HAProxy is determined by its configuration file, `haproxy.cfg`. Sample configurations can be found [here](http://git.haproxy.org/?p=haproxy-2.0.git;a=tree;f=examples).
 
-http://git.haproxy.org/?p=haproxy-1.8.git;a=tree;f=examples
-http://git.haproxy.org/?p=haproxy-1.8.git;a=blob_plain;f=examples/transparent_proxy.cfg;hb=HEAD
+This is a simple `haproxy.cfg` file:
 
+```
+global
+        maxconn 256
+        log stdout local0 debug
+ 
+defaults
+        mode http
+        log global
+        option httplog
+        timeout connect 5000ms
+        timeout client 50000ms
+        timeout server 50000ms
+ 
+frontend rotating-proxies
+        bind *:3128
+        option http_proxy
+        default_backend proxies
+ 
+backend proxies
+        server proxy-1  15.244.85.32:8888 check
+        server proxy-2   16.42.5.170:8888 check
+        server proxy-3  33.179.179.1:8888 check
+        server proxy-4  3.87.204.123:8888 check
+        balance random
+```
 
+### Section: `global`
 
-# roundrobin - Each server is used in turns, according to their weights.
-# leastconn  - The server with the lowest number of connections receives the connection.
-# random
+The `daemon` directive will cause HAProxy to run as a background process.
 
-docker run --rm --name haproxy-rotating -p 3128:3128 datawookie/haproxy-rotating
-docker run --rm --name haproxy-rotating -p 3128:3128 -v $PWD:/usr/local/etc/haproxy:ro datawookie/haproxy-rotating
+### Section: `defaults`
+
+### Section: `frontend`
+
+### Section: `backend`
+
+The `balance` directive determines how requests are allocated to servers. There are a number of options including:
+
+- `roundrobin` (each server used in turn)
+- `leastconn` (favours server with least connections) and
+- `random` (server assigned at random).
+
+## Building the Image
+
+This image is based on the [official Docker Community image](https://hub.docker.com/_/haproxy). The specification of the base image can be found [here](https://hub.docker.com/_/haproxy).
+
+You can build the image manually:
+
+```bash
+docker build -t datawookie/haproxy-rotating .
+```
+
+Alternatively you can use the `build` target in the `Makefile`.
+
+```bash
+make build
+```
+
+## Running the Image
+
+docker run -p 3128:3128 datawookie/haproxy-rotating
+docker run -p 3128:3128 -v $PWD:/usr/local/etc/haproxy:ro datawookie/haproxy-rotating
+
+The `Makefile` also has a `run` target.
+
+```bash
+make run
+```
+
+## Related Projects
+
+- https://github.com/mattes/rotating-proxy
+- https://github.com/39ff/docker-rotating-proxy
